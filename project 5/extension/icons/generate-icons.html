@@ -1,0 +1,72 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>JACE Icon Generator</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      padding: 20px;
+      background: #1a1a1a;
+      color: #f0f0f0;
+    }
+    canvas {
+      margin: 10px;
+      border: 1px solid #333;
+    }
+    .instructions {
+      background: #272727;
+      padding: 20px;
+      border-radius: 10px;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="instructions">
+    <h2>JACE Icon Generator</h2>
+    <p>Right-click each canvas below and "Save image as..." with the specified filename:</p>
+    <ul>
+      <li>Save 16x16 as <code>icon16.png</code></li>
+      <li>Save 48x48 as <code>icon48.png</code></li>
+      <li>Save 128x128 as <code>icon128.png</code></li>
+    </ul>
+  </div>
+
+  <div>
+    <h3>16x16 Icon</h3>
+    <canvas id="icon16" width="16" height="16"></canvas>
+  </div>
+
+  <div>
+    <h3>48x48 Icon</h3>
+    <canvas id="icon48" width="48" height="48"></canvas>
+  </div>
+
+  <div>
+    <h3>128x128 Icon</h3>
+    <canvas id="icon128" width="128" height="128"></canvas>
+  </div>
+
+  <script>
+    function drawIcon(canvas, size) {
+      const ctx = canvas.getContext('2d');
+
+      const radius = size * 0.22;
+      ctx.fillStyle = '#20a565';
+      ctx.beginPath();
+      ctx.roundRect(0, 0, size, size, radius);
+      ctx.fill();
+
+      ctx.fillStyle = 'white';
+      ctx.font = `${size * 0.6}px Arial`;
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText('🧠', size / 2, size / 2);
+    }
+
+    drawIcon(document.getElementById('icon16'), 16);
+    drawIcon(document.getElementById('icon48'), 48);
+    drawIcon(document.getElementById('icon128'), 128);
+  </script>
+</body>
+</html>

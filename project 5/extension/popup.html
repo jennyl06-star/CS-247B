@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>JACE Dashboard</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <div class="container">
+    <header class="header">
+      <div class="wordmark">
+        <div class="wordmark-icon">🧠</div>
+        <span class="wordmark-text">JACE</span>
+      </div>
+      <p class="tagline">Critical Thinking AI Helper</p>
+    </header>
+
+    <nav class="tabs">
+      <button class="tab-btn active" data-tab="dashboard">Dashboard</button>
+      <button class="tab-btn" data-tab="settings">Settings</button>
+    </nav>
+
+    <div id="dashboard-tab" class="tab-content active">
+      <section class="stats">
+        <div class="stat-card">
+          <div class="stat-value" id="total-prompts">0</div>
+          <div class="stat-label">Total Prompts</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="avg-score">-</div>
+          <div class="stat-label">Avg Score</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-value" id="skip-rate">0%</div>
+          <div class="stat-label">Skip Rate</div>
+        </div>
+      </section>
+
+      <section class="history">
+        <div class="section-header">
+          <h3>Recent Activity</h3>
+          <button class="btn-icon" id="refresh-history" title="Refresh">↻</button>
+        </div>
+        <div id="history-list" class="history-list">
+          <div class="empty-state">No activity yet. Start using JACE on supported platforms!</div>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button class="btn btn-secondary" id="export-logs">Export Data</button>
+        <button class="btn btn-ghost" id="clear-logs">Clear All Data</button>
+      </div>
+    </div>
+
+    <div id="settings-tab" class="tab-content">
+      <section class="settings-section">
+        <h3>Participant Info</h3>
+        <div class="form-group">
+          <label for="participant-id">Participant ID</label>
+          <input type="text" id="participant-id" placeholder="e.g., P001" />
+        </div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Intervention Settings</h3>
+
+        <div class="form-group">
+          <label for="num-questions">Questions per Round: <span id="num-questions-value">2</span></label>
+          <input type="range" id="num-questions" min="1" max="5" value="2" />
+        </div>
+
+        <div class="form-group">
+          <label for="max-rounds">Maximum Rounds: <span id="max-rounds-value">2</span></label>
+          <input type="range" id="max-rounds" min="1" max="3" value="2" />
+        </div>
+
+        <div class="form-group">
+          <label for="intent-threshold">Intent Threshold (1-10): <span id="intent-threshold-value">6</span></label>
+          <input type="range" id="intent-threshold" min="1" max="10" value="6" />
+          <small>Questions scoring below this are skipped</small>
+        </div>
+
+        <div class="form-group">
+          <label for="min-score-r1">Min Score Round 1: <span id="min-score-r1-value">7</span>/10</label>
+          <input type="range" id="min-score-r1" min="1" max="10" value="7" />
+        </div>
+
+        <div class="form-group">
+          <label for="min-score-r2">Min Score Round 2: <span id="min-score-r2-value">5</span>/10</label>
+          <input type="range" id="min-score-r2" min="1" max="10" value="5" />
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="append-context" checked />
+            <span>Append planning context to prompt</span>
+          </label>
+        </div>
+
+        <div class="form-group checkbox-group">
+          <label>
+            <input type="checkbox" id="log-data" checked />
+            <span>Enable data logging</span>
+          </label>
+        </div>
+      </section>
+
+      <div class="actions">
+        <button class="btn btn-primary" id="save-settings">Save Settings</button>
+      </div>
+
+      <div id="save-message" class="message"></div>
+    </div>
+  </div>
+
+  <script src="supabase-client.js"></script>
+  <script src="popup.js"></script>
+</body>
+</html>
