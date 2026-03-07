@@ -14,6 +14,7 @@
     FAMILIARITY_CHECK: true,
     MIN_SCORE_ROUND_1: 7,
     MIN_SCORE_ROUND_2: 5,
+    ENABLED_PLATFORMS: { chatgpt: true, claude: true, gemini: true, copilot: true },
   };
 
   const PLATFORMS = {
@@ -767,6 +768,10 @@ You MUST respond with a JSON object with these exact keys:
     }
     if (!state.platform) {
       console.log("[JACE] Skipped - Platform not detected");
+      return;
+    }
+    if (CONFIG.ENABLED_PLATFORMS && CONFIG.ENABLED_PLATFORMS[state.platform.key] === false) {
+      console.log("[JACE] Skipped - Platform disabled:", state.platform.name);
       return;
     }
 

@@ -13,46 +13,21 @@ A Chrome extension that encourages critical thinking before sending prompts to A
 
 ## Installation
 
-### Generate Icons
+### Download the Extension
 
-1. Open `extension/icons/generate-icons.html` in your browser
-2. Right-click each canvas and save as:
-   - `icon16.png`
-   - `icon48.png`
-   - `icon128.png`
-3. Save all icons in the `extension/icons/` directory
+1. Download the JACE extension zip file
+   - **Link: TBD**
+2. Unzip the file to a folder on your computer
 
 ### Load Extension in Chrome
 
 1. Open Chrome and go to `chrome://extensions/`
 2. Enable **Developer mode** (toggle in top right)
 3. Click **Load unpacked**
-4. Select the `extension` folder
+4. Select the unzipped `extension` folder
 5. The JACE extension should now appear in your extensions list
 
 ## Configuration
-
-### ⚠️ REQUIRED: API Setup
-
-**The extension will not work until you configure the API authentication.**
-
-You will see `403` errors in the console until this is set up.
-
-#### Option 1: Get Research Study Credentials (Recommended)
-If you're part of a research study, contact your researcher to get the `PROXY_SECRET`.
-
-1. Open `extension/content-script.js`
-2. Find line 6: `PROXY_SECRET: ""`
-3. Add the secret provided by your researcher
-
-#### Option 2: Use Your Own OpenAI API Key
-If running independently:
-
-1. Get an API key from https://platform.openai.com/api-keys
-2. Modify `extension/background.js` to use OpenAI directly (see `API_SETUP_REQUIRED.md`)
-3. Note: This will cost money based on usage (~$0.15 per 1M tokens)
-
-See `API_SETUP_REQUIRED.md` in the project root for detailed instructions.
 
 ### First-Time Setup
 
@@ -133,9 +108,8 @@ To export your data:
 - Check browser console for errors (F12 → Console)
 
 ### Questions Not Generating
-- Verify the proxy URL is accessible
 - Check your internet connection
-- Ensure the API key is configured (if using private proxy)
+- Refresh the page and try again
 
 ### Settings Not Saving
 - Check Chrome storage permissions
