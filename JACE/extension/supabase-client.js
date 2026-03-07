@@ -42,15 +42,17 @@ class SupabaseClient {
     }
 
     const config = {
-      headers: this.headers
+      headers: { ...this.headers }
     };
 
     if (insert) {
       config.method = 'POST';
       config.body = JSON.stringify(insert);
+      config.headers['Prefer'] = 'return=representation';
     } else if (update) {
       config.method = 'PATCH';
       config.body = JSON.stringify(update);
+      config.headers['Prefer'] = 'return=representation';
     } else {
       config.method = 'GET';
     }

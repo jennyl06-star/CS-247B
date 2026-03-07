@@ -134,26 +134,45 @@
     return null;
   }
 
+  function isContextValid() {
+    try {
+      return !!chrome.runtime?.id;
+    } catch {
+      return false;
+    }
+  }
+
   async function callOpenAI(systemPrompt, userMessage, jsonMode = true) {
+    if (!isContextValid()) {
+      throw new Error("Extension context invalidated. Please refresh the page.");
+    }
     return new Promise((resolve, reject) => {
-      chrome.runtime.sendMessage(
-        {
-          type: "API_CALL",
-          data: {
-            systemPrompt,
-            userMessage,
-            jsonMode,
-            config: CONFIG,
+      try {
+        chrome.runtime.sendMessage(
+          {
+            type: "API_CALL",
+            data: {
+              systemPrompt,
+              userMessage,
+              jsonMode,
+              config: CONFIG,
+            },
           },
-        },
-        (response) => {
-          if (response.success) {
-            resolve(response.data);
-          } else {
-            reject(new Error(response.error || "API call failed"));
+          (response) => {
+            if (chrome.runtime.lastError) {
+              reject(new Error(chrome.runtime.lastError.message));
+              return;
+            }
+            if (response.success) {
+              resolve(response.data);
+            } else {
+              reject(new Error(response.error || "API call failed"));
+            }
           }
-        }
-      );
+        );
+      } catch (err) {
+        reject(err);
+      }
     });
   }
 
@@ -497,11 +516,13 @@ You MUST respond with a JSON object with these exact keys:
       state.participantId = pid;
       state.consentGiven = true;
 
-      chrome.storage.local.set({
-        cti_participant_id: pid,
-        cti_consent_given: true,
-        cti_consent_timestamp: new Date().toISOString(),
-      });
+      try {
+        chrome.storage.local.set({
+          cti_participant_id: pid,
+          cti_consent_given: true,
+          cti_consent_timestamp: new Date().toISOString(),
+        });
+      } catch {}
 
       logEvent("consent_given", { participantId: pid });
 
@@ -876,6 +897,10 @@ You MUST respond with a JSON object with these exact keys:
                 .then((questions) => {
                   logEvent("questions_generated", { questions: questions.map((q) => q.question) });
                   showQuestions(modal, promptText, questions);
+                })
+                .catch((err) => {
+                  console.error("CTI question generation error:", err);
+                  closeModalAndSend(promptText, null);
                 });
             },
             () => {
@@ -931,6 +956,7 @@ You MUST respond with a JSON object with these exact keys:
 
   function logEvent(eventType, data) {
     if (!CONFIG.LOG_DATA) return;
+    if (!isContextValid()) return;
 
     const entry = {
       timestamp: new Date().toISOString(),
@@ -943,20 +969,25 @@ You MUST respond with a JSON object with these exact keys:
 
     state.sessionLog.push(entry);
 
-    chrome.storage.local.get(["cti_logs"], (result) => {
-      const allLogs = result.cti_logs || [];
-      allLogs.push(entry);
-      chrome.storage.local.set({ cti_logs: allLogs });
-    });
+    try {
+      chrome.storage.local.get(["cti_logs"], (result) => {
+        if (chrome.runtime.lastError) return;
+        const allLogs = result.cti_logs || [];
+        allLogs.push(entry);
+        chrome.storage.local.set({ cti_logs: allLogs });
+      });
+    } catch {}
 
     console.log("[JACE Log]", entry);
 
-    if (CONFIG.GOOGLE_SHEET_WEBHOOK && CONFIG.GOOGLE_SHEET_WEBHOOK !== "YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
-      chrome.runtime.sendMessage({
-        type: "LOG_TO_SHEET",
-        data: { entry, webhookUrl: CONFIG.GOOGLE_SHEET_WEBHOOK },
-      });
-    }
+    try {
+      if (CONFIG.GOOGLE_SHEET_WEBHOOK && CONFIG.GOOGLE_SHEET_WEBHOOK !== "YOUR_GOOGLE_APPS_SCRIPT_URL_HERE") {
+        chrome.runtime.sendMessage({
+          type: "LOG_TO_SHEET",
+          data: { entry, webhookUrl: CONFIG.GOOGLE_SHEET_WEBHOOK },
+        });
+      }
+    } catch {}
   }
 
   function escapeHtml(str) {
