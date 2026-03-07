@@ -880,35 +880,41 @@ You MUST respond with a JSON object with these exact keys:
       console.log(`[JACE] Proceeding with intervention (complexity score: ${intentAnalysis.complexity_score}/${CONFIG.INTENT_THRESHOLD})`);
 
       if (CONFIG.FAMILIARITY_CHECK) {
-        showLoading(modal, "Checking if familiarity check is needed...");
+        showLoading(modal, "Checking concept...");
 
-        const familiarityCheck = await checkFamiliarity(promptText);
-
-        if (familiarityCheck.ask_familiarity) {
-          showFamiliarityCheck(modal, promptText, familiarityCheck.concept_name,
-            () => {
-              showLoading(modal, "Generating your reflection questions...");
-              generateQuestions(promptText, false, null)
-                .then((questions) => {
-                  logEvent("questions_generated", { questions: questions.map((q) => q.question) });
-                  showQuestions(modal, promptText, questions);
-                })
-                .catch((err) => {
-                  console.error("CTI question generation error:", err);
-                  closeModalAndSend(promptText, null);
-                });
-            },
-            () => {
-              logEvent("familiarity_low", { prompt: promptText, concept: familiarityCheck.concept_name });
-              overlay.classList.remove("visible");
-              setTimeout(() => overlay.remove(), 300);
-              state.interceptActive = false;
-              state.isFirstMessage = false;
-              setTimeout(() => clickSendButton(), 100);
-            }
-          );
-          return;
+        let conceptName = "this concept";
+        try {
+          const familiarityCheck = await checkFamiliarity(promptText);
+          if (familiarityCheck.concept_name) {
+            conceptName = familiarityCheck.concept_name;
+          }
+        } catch (err) {
+          console.warn("[JACE] Familiarity check failed, using generic concept name:", err);
         }
+
+        showFamiliarityCheck(modal, promptText, conceptName,
+          () => {
+            showLoading(modal, "Generating your reflection questions...");
+            generateQuestions(promptText, false, null)
+              .then((questions) => {
+                logEvent("questions_generated", { questions: questions.map((q) => q.question) });
+                showQuestions(modal, promptText, questions);
+              })
+              .catch((err) => {
+                console.error("CTI question generation error:", err);
+                closeModalAndSend(promptText, null);
+              });
+          },
+          () => {
+            logEvent("familiarity_low", { prompt: promptText, concept: conceptName });
+            overlay.classList.remove("visible");
+            setTimeout(() => overlay.remove(), 300);
+            state.interceptActive = false;
+            state.isFirstMessage = false;
+            setTimeout(() => clickSendButton(), 100);
+          }
+        );
+        return;
       }
 
       showLoading(modal, "Generating your reflection questions...");
