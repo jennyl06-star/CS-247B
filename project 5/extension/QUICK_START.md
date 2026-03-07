@@ -2,16 +2,17 @@
 
 ## Step 1: Install Extension (30 seconds)
 
-1. **Download the Extension**:
-   - Download the JACE extension zip file (**Link: TBD**)
-   - Unzip the file to a folder on your computer
+1. **Generate Icons First**:
+   - Open `icons/generate-icons.html` in your browser
+   - Save the 3 squares as PNG files
+   - Put them in `icons/` folder
 
 2. **Load Extension**:
    - Open Chrome
    - Go to `chrome://extensions/`
    - Toggle ON "Developer mode" (top-right)
    - Click "Load unpacked"
-   - Select the unzipped `extension` folder
+   - Select the `extension` folder
 
 ## Step 2: Setup (30 seconds)
 

@@ -6,7 +6,6 @@ const DEFAULT_CONFIG = {
   LOG_DATA: true,
   MIN_SCORE_ROUND_1: 7,
   MIN_SCORE_ROUND_2: 5,
-  ENABLED_PLATFORMS: { chatgpt: true, claude: true, gemini: true, copilot: true },
 };
 
 let supabase = null;
@@ -226,12 +225,6 @@ function loadSettings() {
 
     document.getElementById('append-context').checked = config.APPEND_PLANNING_TO_PROMPT !== false;
     document.getElementById('log-data').checked = config.LOG_DATA !== false;
-
-    const platforms = config.ENABLED_PLATFORMS || DEFAULT_CONFIG.ENABLED_PLATFORMS;
-    document.getElementById('platform-chatgpt').checked = platforms.chatgpt !== false;
-    document.getElementById('platform-claude').checked = platforms.claude !== false;
-    document.getElementById('platform-gemini').checked = platforms.gemini !== false;
-    document.getElementById('platform-copilot').checked = platforms.copilot !== false;
   });
 }
 
@@ -274,12 +267,6 @@ function saveSettings() {
     MIN_SCORE_ROUND_2: parseInt(document.getElementById('min-score-r2').value),
     APPEND_PLANNING_TO_PROMPT: document.getElementById('append-context').checked,
     LOG_DATA: document.getElementById('log-data').checked,
-    ENABLED_PLATFORMS: {
-      chatgpt: document.getElementById('platform-chatgpt').checked,
-      claude: document.getElementById('platform-claude').checked,
-      gemini: document.getElementById('platform-gemini').checked,
-      copilot: document.getElementById('platform-copilot').checked,
-    },
   };
 
   chrome.storage.local.set({

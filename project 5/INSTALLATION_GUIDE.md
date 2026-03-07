@@ -21,13 +21,47 @@ extension/
     └── README.md
 ```
 
-## 📥 Step 1: Download the Extension
+## 🎨 Step 1: Generate Icons
 
-1. Download the JACE extension zip file
-   - **Link: TBD**
-2. Unzip the file to a folder on your computer
+### Option A: Using the Icon Generator (Recommended)
 
-## 🔧 Step 2: Default Settings
+1. Open `extension/icons/generate-icons.html` in Chrome
+2. Right-click each canvas image and select "Save image as..."
+3. Save the files as:
+   - `icon16.png` (16x16 canvas)
+   - `icon48.png` (48x48 canvas)
+   - `icon128.png` (128x128 canvas)
+4. Save all three files in the `extension/icons/` directory
+
+### Option B: Create Icons Manually
+
+If the generator doesn't work:
+
+1. Create a 128x128 square image with:
+   - Background: Green (#20a565)
+   - Border radius: ~28px
+   - Brain emoji 🧠 centered
+2. Export/resize to create:
+   - `icon16.png` (16x16)
+   - `icon48.png` (48x48)
+   - `icon128.png` (128x128)
+
+## 🔧 Step 2: Configure the Extension (Optional)
+
+### Update API Endpoints
+
+If you have custom API endpoints, edit `extension/content-script.js`:
+
+```javascript
+const CONFIG = {
+  PROXY_URL: "https://your-proxy-url.workers.dev",  // Your Cloudflare Worker
+  PROXY_SECRET: "your-secret-key",                  // Optional secret
+  GOOGLE_SHEET_WEBHOOK: "https://script.google.com/...",  // Google Apps Script URL
+  // ... other settings
+};
+```
+
+### Default Settings
 
 The extension comes with these defaults:
 - **Questions per Round**: 2
@@ -53,7 +87,7 @@ These can be changed in the extension popup after installation.
 
 3. **Load the Extension**
    - Click "Load unpacked" button
-   - Navigate to and select the unzipped `extension` folder
+   - Navigate to and select the `extension/` folder
    - Click "Select Folder"
 
 4. **Verify Installation**
@@ -67,6 +101,13 @@ These can be changed in the extension popup after installation.
 - Ensure you selected the `extension/` folder, not the project root
 - Verify `manifest.json` exists in the selected folder
 
+**Error: "Icons not found"**
+- Generate the icons following Step 1
+- Ensure all three icon files are in `extension/icons/`
+
+**Extension loads but icon is blank**
+- The icons are missing or incorrectly named
+- Check `extension/icons/` contains: `icon16.png`, `icon48.png`, `icon128.png`
 
 ## ✅ Step 4: First-Time Setup
 
@@ -248,14 +289,15 @@ After making code changes:
 ## 🆘 Getting Help
 
 ### Extension Not Working?
-1. Verify developer mode is enabled
-2. Refresh the AI platform page
-3. Check browser console for errors
+1. Check icon generation (Step 1)
+2. Verify developer mode is enabled
+3. Refresh the AI platform page
+4. Check browser console for errors
 
 ### Questions Not Generating?
-1. Check your internet connection
-2. Ensure question complexity > threshold
-3. Refresh the page and try again
+1. Verify PROXY_URL is accessible
+2. Check internet connection
+3. Ensure question complexity > threshold
 
 ### Settings Not Saving?
 1. Verify Chrome storage permissions
