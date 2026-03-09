@@ -63,6 +63,41 @@
       </section>
 
       <section class="settings-section">
+        <h3>Active Platforms</h3>
+        <p class="settings-hint">Uncheck a platform to disable JACE on that site.</p>
+        <div class="platform-grid">
+          <label class="platform-toggle">
+            <input type="checkbox" id="platform-chatgpt" checked />
+            <span class="platform-toggle-box">
+              <span class="platform-toggle-icon">🤖</span>
+              <span class="platform-toggle-name">ChatGPT</span>
+            </span>
+          </label>
+          <label class="platform-toggle">
+            <input type="checkbox" id="platform-claude" checked />
+            <span class="platform-toggle-box">
+              <span class="platform-toggle-icon">🟠</span>
+              <span class="platform-toggle-name">Claude</span>
+            </span>
+          </label>
+          <label class="platform-toggle">
+            <input type="checkbox" id="platform-gemini" checked />
+            <span class="platform-toggle-box">
+              <span class="platform-toggle-icon">✨</span>
+              <span class="platform-toggle-name">Gemini</span>
+            </span>
+          </label>
+          <label class="platform-toggle">
+            <input type="checkbox" id="platform-copilot" checked />
+            <span class="platform-toggle-box">
+              <span class="platform-toggle-icon">🪟</span>
+              <span class="platform-toggle-name">Copilot</span>
+            </span>
+          </label>
+        </div>
+      </section>
+
+      <section class="settings-section">
         <h3>Intervention Settings</h3>
 
         <div class="form-group">
@@ -82,13 +117,13 @@
         </div>
 
         <div class="form-group">
-          <label for="min-score-r1">Min Score Round 1: <span id="min-score-r1-value">7</span>/10</label>
-          <input type="range" id="min-score-r1" min="1" max="10" value="7" />
+          <label for="min-score-r1">Min Score Round 1: <span id="min-score-r1-value">70</span>/100</label>
+          <input type="range" id="min-score-r1" min="1" max="100" value="70" />
         </div>
 
         <div class="form-group">
-          <label for="min-score-r2">Min Score Round 2: <span id="min-score-r2-value">5</span>/10</label>
-          <input type="range" id="min-score-r2" min="1" max="10" value="5" />
+          <label for="min-score-r2">Min Score Round 2: <span id="min-score-r2-value">50</span>/100</label>
+          <input type="range" id="min-score-r2" min="1" max="100" value="50" />
         </div>
 
         <div class="form-group checkbox-group">

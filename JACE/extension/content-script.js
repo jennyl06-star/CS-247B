@@ -12,8 +12,9 @@
     LOG_DATA: true,
     INTENT_THRESHOLD: 6,
     FAMILIARITY_CHECK: true,
-    MIN_SCORE_ROUND_1: 7,
-    MIN_SCORE_ROUND_2: 5,
+    MIN_SCORE_ROUND_1: 70,
+    MIN_SCORE_ROUND_2: 50,
+    ENABLED_PLATFORMS: { chatgpt: true, claude: true, gemini: true, copilot: true },
   };
 
   const PLATFORMS = {
@@ -42,19 +43,33 @@
       hostMatch: (h) => h.includes("claude.ai"),
       inputSelectors: [
         '.ProseMirror[contenteditable="true"]',
+        '[data-testid="chat-input"] [contenteditable="true"]',
+        'fieldset .ProseMirror',
         'div[data-placeholder][contenteditable="true"]',
-        'div[contenteditable="true"]',
         'fieldset div[contenteditable="true"]',
+        'div[contenteditable="true"]',
       ],
       sendSelectors: [
         'button[data-testid="send-button"]',
+        'button[aria-label="Send Message"]',
+        'button[aria-label="Send message"]',
         'button[aria-label*="Send" i]',
-        'button[aria-label*="Send message" i]',
+        'fieldset button[type="submit"]',
+        'form button[type="submit"]',
       ],
       newConvoCheck: () => {
         const url = window.location.href;
-        if (url.match(/^https:\/\/claude\.ai\/(new)?\/?$/)) return true;
-        const messages = document.querySelectorAll('[data-is-streaming], .font-claude-message, div[class*="Message"]');
+        // Explicit new/empty chat URLs
+        if (url.match(/^https:\/\/claude\.ai\/(new|chats)?\/?$/)) return true;
+        // Look for actual human or AI message content in the conversation
+        const messages = document.querySelectorAll(
+          '[data-is-streaming], ' +
+          '.font-claude-message, ' +
+          '[data-testid="human-turn"], ' +
+          '[data-testid="ai-turn"], ' +
+          '.human-turn, .ai-turn, ' +
+          '[class*="HumanTurn"], [class*="AssistantTurn"]'
+        );
         return messages.length === 0;
       },
     },
@@ -275,17 +290,21 @@ Evaluate whether the student has:
 - Demonstrated some understanding or honest self-assessment
 - Formed at least a rough plan or identified what they need
 
-Score their responses from 1-10 where:
-- 1-3: Minimal effort (e.g., "idk", "yes", single words)
-- 4-6: Some effort but could be deeper
-- 7-8: Good engagement and thoughtfulness
-- 9-10: Excellent critical thinking
+Score their responses from 1-100 where:
+- 1-20: Completely minimal effort — gibberish, random characters, or no attempt at all
+- 21-40: Very little effort — single words, "idk", or clearly not trying
+- 41-65: Some effort but shallow — student tried but answers are brief or surface-level
+- 66-80: Good engagement — student showed real thought, even if answers are imperfect or brief
+- 81-90: Strong engagement — clear understanding and thoughtful planning
+- 91-100: Excellent critical thinking — thorough, insightful, well-reasoned
 
-IMPORTANT: This is Round ${roundNumber + 1}. The minimum passing score is ${minScore}/10.
+Be generous: reward any genuine attempt to think through the problem. A student who tries but gives imperfect answers should score in the 60s or 70s, not the 40s. Reserve low scores (below 40) only for students who are clearly not making any real effort.
+
+IMPORTANT: This is Round ${roundNumber + 1}. The minimum passing score is ${minScore}/100.
 
 You MUST respond with a JSON object with these exact keys:
 {
-  "score": number (1-10),
+  "score": number (1-100),
   "sufficient": true or false (true if score >= ${minScore}),
   "feedback": "Brief encouraging feedback or gentle nudge to think deeper (2-3 sentences max)",
   "strengthened_prompt_addition": "A 1-2 sentence summary of their planning that can be appended to improve their prompt. Generate this even if score is below threshold, as long as answers aren't complete gibberish."
@@ -329,9 +348,11 @@ You MUST respond with a JSON object with these exact keys:
     el.focus();
 
     if (el.contentEditable === "true" || el.getAttribute("contenteditable") === "true") {
-      el.innerHTML = "";
+      // Select all existing content then replace — preserves ProseMirror/React state
+      document.execCommand("selectAll", false, null);
       document.execCommand("insertText", false, text);
-      el.dispatchEvent(new Event("input", { bubbles: true }));
+      // Dispatch events to trigger framework state updates
+      el.dispatchEvent(new InputEvent("input", { bubbles: true, cancelable: true, inputType: "insertText", data: text }));
     } else {
       const nativeSetter = Object.getOwnPropertyDescriptor(
         window.HTMLTextAreaElement.prototype, "value"
@@ -547,8 +568,8 @@ You MUST respond with a JSON object with these exact keys:
   }
 
   function getScoreBadgeClass(score) {
-    if (score >= 7) return "high";
-    if (score >= 4) return "medium";
+    if (score >= 70) return "high";
+    if (score >= 40) return "medium";
     return "low";
   }
 
@@ -590,7 +611,7 @@ You MUST respond with a JSON object with these exact keys:
     }).join("");
 
     const scoreBadge = evaluationScore !== null
-      ? `<span class="cti-score-badge ${getScoreBadgeClass(evaluationScore)}">Score: ${evaluationScore}/10</span>`
+      ? `<span class="cti-score-badge ${getScoreBadgeClass(evaluationScore)}">Score: ${evaluationScore}/100</span>`
       : '';
 
     const feedbackHTML = feedback
@@ -771,9 +792,24 @@ You MUST respond with a JSON object with these exact keys:
     state.interceptActive = false;
     state.isFirstMessage = false;
 
+    const isClaude = state.platform?.key === "claude";
+    const sendDelay = isClaude ? 600 : 300;
+
     setTimeout(() => {
       setPromptText(promptText);
-      setTimeout(() => clickSendButton(), 300);
+      // Claude needs extra time for its React state to re-enable the send button
+      setTimeout(() => {
+        clickSendButton();
+        // Fallback: retry once if first attempt may have hit a disabled button
+        if (isClaude) {
+          setTimeout(() => {
+            const btn = document.querySelector(
+              'button[data-testid="send-button"], button[aria-label="Send Message"], button[aria-label="Send message"]'
+            );
+            if (btn && !btn.disabled) btn.click();
+          }, 400);
+        }
+      }, sendDelay);
     }, 400);
   }
 
@@ -1022,66 +1058,75 @@ You MUST respond with a JSON object with these exact keys:
         Object.assign(CONFIG, result.cti_config);
       }
 
+      // Check if JACE is enabled for this platform
+      const platformKey = state.platform?.key;
+      const enabled = CONFIG.ENABLED_PLATFORMS || {};
+      if (platformKey && enabled[platformKey] === false) {
+        console.log(`[JACE] Disabled for platform: ${state.platform.name}`);
+        return;
+      }
+
       if (!state.consentGiven) {
         setTimeout(showConsentModal, 2000);
       }
-    });
 
-    document.addEventListener("keydown", interceptSubmission, true);
-    document.addEventListener("click", interceptSubmission, true);
-    document.addEventListener("pointerdown", interceptSubmission, true);
-    document.addEventListener("mousedown", interceptSubmission, true);
+      // Attach send interceptors only if platform is enabled
+      document.addEventListener("keydown", interceptSubmission, true);
+      document.addEventListener("click", interceptSubmission, true);
+      document.addEventListener("pointerdown", interceptSubmission, true);
+      document.addEventListener("mousedown", interceptSubmission, true);
 
-    let lastAttachedBtn = null;
-    setInterval(() => {
-      if (!state.isFirstMessage || state.interceptActive || !state.consentGiven) return;
+      let lastAttachedBtn = null;
+      setInterval(() => {
+        if (!state.isFirstMessage || state.interceptActive || !state.consentGiven) return;
 
-      const platform = state.platform;
-      if (!platform) return;
+        const platform = state.platform;
+        if (!platform) return;
 
-      for (const sel of platform.sendSelectors) {
-        const btn = document.querySelector(sel);
-        if (btn && btn !== lastAttachedBtn) {
-          lastAttachedBtn = btn;
-          btn.addEventListener("pointerdown", interceptSubmission, true);
-          btn.addEventListener("mousedown", interceptSubmission, true);
-          btn.addEventListener("click", interceptSubmission, true);
-        }
-      }
-
-      for (const sel of platform.inputSelectors) {
-        const input = document.querySelector(sel);
-        if (input && !input._ctiAttached) {
-          input._ctiAttached = true;
-          input.addEventListener("keydown", interceptSubmission, true);
-        }
-      }
-    }, 1000);
-
-    let lastUrl = location.href;
-    setInterval(() => {
-      if (location.href !== lastUrl) {
-        lastUrl = location.href;
-        console.log("[JACE] Navigation detected:", lastUrl);
-        lastAttachedBtn = null;
-        setTimeout(() => {
-          if (isNewConversation()) {
-            state.isFirstMessage = true;
-            state.interceptActive = false;
-            state.reflectionLoop = 0;
-            state.round1Questions = [];
-            state.round1Answers = [];
-            console.log("[JACE] New conversation — intervention armed");
+        for (const sel of platform.sendSelectors) {
+          const btn = document.querySelector(sel);
+          if (btn && btn !== lastAttachedBtn) {
+            lastAttachedBtn = btn;
+            btn.addEventListener("pointerdown", interceptSubmission, true);
+            btn.addEventListener("mousedown", interceptSubmission, true);
+            btn.addEventListener("click", interceptSubmission, true);
           }
-        }, 500);
-      }
-    }, 500);
+        }
 
-    console.log(
-      `%c🧠 JACE v5.0 — Chrome Extension`,
-      "color: #20a565; font-weight: bold; font-size: 14px;"
-    );
-    console.log(`  Platform: ${state.platform.name}`);
+        for (const sel of platform.inputSelectors) {
+          const input = document.querySelector(sel);
+          if (input && !input._ctiAttached) {
+            input._ctiAttached = true;
+            input.addEventListener("keydown", interceptSubmission, true);
+          }
+        }
+      }, 1000);
+
+      let lastUrl = location.href;
+      setInterval(() => {
+        if (location.href !== lastUrl) {
+          lastUrl = location.href;
+          console.log("[JACE] Navigation detected:", lastUrl);
+          lastAttachedBtn = null;
+          setTimeout(() => {
+            if (isNewConversation()) {
+              state.isFirstMessage = true;
+              state.interceptActive = false;
+              state.reflectionLoop = 0;
+              state.round1Questions = [];
+              state.round1Answers = [];
+              console.log("[JACE] New conversation — intervention armed");
+            }
+          }, 500);
+        }
+      }, 500);
+
+      console.log(
+        `%c🧠 JACE v5.0 — Chrome Extension`,
+        "color: #20a565; font-weight: bold; font-size: 14px;"
+      );
+      console.log(`  Platform: ${state.platform.name}`);
+    });
   }
 
   setTimeout(init, 2000);

@@ -401,6 +401,62 @@ body {
   cursor: pointer;
 }
 
+.settings-hint {
+  font-size: 11px;
+  color: var(--jace-text-dim);
+  margin-bottom: 12px;
+}
+
+.platform-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+.platform-toggle {
+  cursor: pointer;
+  display: block;
+}
+
+.platform-toggle input[type="checkbox"] {
+  display: none;
+}
+
+.platform-toggle-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  background: var(--jace-surface);
+  border: 1px solid var(--jace-border);
+  border-radius: var(--jace-radius-sm);
+  transition: all 0.2s;
+  user-select: none;
+}
+
+.platform-toggle input[type="checkbox"]:checked + .platform-toggle-box {
+  border-color: var(--jace-green-mid);
+  background: rgba(32, 165, 101, 0.12);
+}
+
+.platform-toggle:hover .platform-toggle-box {
+  background: var(--jace-surface-2);
+}
+
+.platform-toggle-icon {
+  font-size: 14px;
+}
+
+.platform-toggle-name {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--jace-text-muted);
+}
+
+.platform-toggle input[type="checkbox"]:checked + .platform-toggle-box .platform-toggle-name {
+  color: var(--jace-text);
+}
+
 .message {
   margin-top: 12px;
   padding: 10px 12px;

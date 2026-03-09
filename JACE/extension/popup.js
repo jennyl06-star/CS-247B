@@ -4,8 +4,9 @@ const DEFAULT_CONFIG = {
   INTENT_THRESHOLD: 6,
   APPEND_PLANNING_TO_PROMPT: true,
   LOG_DATA: true,
-  MIN_SCORE_ROUND_1: 7,
-  MIN_SCORE_ROUND_2: 5,
+  MIN_SCORE_ROUND_1: 70,
+  MIN_SCORE_ROUND_2: 50,
+  ENABLED_PLATFORMS: { chatgpt: true, claude: true, gemini: true, copilot: true },
 };
 
 let supabase = null;
@@ -103,7 +104,7 @@ function updateHistoryFromSupabase(history) {
       badges.push('<span class="history-badge completed">Completed</span>');
     }
     if (query.final_score !== null) {
-      badges.push(`<span class="history-badge score">Score: ${query.final_score}/10</span>`);
+      badges.push(`<span class="history-badge score">Score: ${query.final_score}/100</span>`);
     }
 
     return `
@@ -192,7 +193,7 @@ function updateHistoryFromLogs(logs) {
       badges.push('<span class="history-badge completed">Completed</span>');
     }
     if (session.score !== null) {
-      badges.push(`<span class="history-badge score">Score: ${session.score}/10</span>`);
+      badges.push(`<span class="history-badge score">Score: ${session.score}/100</span>`);
     }
 
     return `
@@ -214,6 +215,7 @@ function loadSettings() {
     'cti_config',
   ], (result) => {
     const config = result.cti_config || DEFAULT_CONFIG;
+    const enabled = config.ENABLED_PLATFORMS || DEFAULT_CONFIG.ENABLED_PLATFORMS;
 
     document.getElementById('participant-id').value = result.cti_participant_id || '';
 
@@ -225,6 +227,11 @@ function loadSettings() {
 
     document.getElementById('append-context').checked = config.APPEND_PLANNING_TO_PROMPT !== false;
     document.getElementById('log-data').checked = config.LOG_DATA !== false;
+
+    document.getElementById('platform-chatgpt').checked = enabled.chatgpt !== false;
+    document.getElementById('platform-claude').checked = enabled.claude !== false;
+    document.getElementById('platform-gemini').checked = enabled.gemini !== false;
+    document.getElementById('platform-copilot').checked = enabled.copilot !== false;
   });
 }
 
@@ -233,6 +240,12 @@ function setSliderValue(id, value) {
   const valueDisplay = document.getElementById(`${id}-value`);
   slider.value = value;
   valueDisplay.textContent = value;
+}
+
+function updateSliderLabel(id) {
+  const slider = document.getElementById(id);
+  const valueDisplay = document.getElementById(`${id}-value`);
+  valueDisplay.textContent = slider.value;
 }
 
 function setupEventListeners() {
@@ -267,6 +280,12 @@ function saveSettings() {
     MIN_SCORE_ROUND_2: parseInt(document.getElementById('min-score-r2').value),
     APPEND_PLANNING_TO_PROMPT: document.getElementById('append-context').checked,
     LOG_DATA: document.getElementById('log-data').checked,
+    ENABLED_PLATFORMS: {
+      chatgpt: document.getElementById('platform-chatgpt').checked,
+      claude: document.getElementById('platform-claude').checked,
+      gemini: document.getElementById('platform-gemini').checked,
+      copilot: document.getElementById('platform-copilot').checked,
+    },
   };
 
   chrome.storage.local.set({
