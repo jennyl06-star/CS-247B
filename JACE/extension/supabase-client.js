@@ -3,6 +3,20 @@ const SUPABASE_CONFIG = {
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imd6cXl1aGtpa2V5YWllcWlqZ3BzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDA3OTM3NDUsImV4cCI6MjA1NjM2OTc0NX0.Hf-2UUxYz0nOGn7aYnfQ5hLnKZbZUkQx-BYyvvSQSdw'
 };
 
+// Detect whether this script is running inside a content script (not the extension popup).
+// Content scripts use the host page's origin for CORS, which breaks direct Supabase calls.
+// We proxy through the background service worker instead.
+function _isContentScript() {
+  try {
+    return typeof chrome !== 'undefined' &&
+      typeof chrome.runtime !== 'undefined' &&
+      typeof chrome.runtime.sendMessage === 'function' &&
+      !window.location.href.startsWith('chrome-extension://');
+  } catch {
+    return false;
+  }
+}
+
 class SupabaseClient {
   constructor() {
     this.url = SUPABASE_CONFIG.url;
@@ -13,15 +27,13 @@ class SupabaseClient {
     };
   }
 
-  async query(table, options = {}) {
+  _buildRequest(table, options = {}) {
     const { select, insert, update, eq, order, limit } = options;
 
     let url = `${this.url}/rest/v1/${table}`;
     const params = new URLSearchParams();
 
-    if (select) {
-      params.append('select', select);
-    }
+    if (select) params.append('select', select);
 
     if (eq) {
       for (const [key, value] of Object.entries(eq)) {
@@ -29,44 +41,63 @@ class SupabaseClient {
       }
     }
 
-    if (order) {
-      params.append('order', order);
-    }
+    if (order) params.append('order', order);
+    if (limit) params.append('limit', limit);
+    if (params.toString()) url += `?${params.toString()}`;
 
-    if (limit) {
-      params.append('limit', limit);
-    }
-
-    if (params.toString()) {
-      url += `?${params.toString()}`;
-    }
-
-    const config = {
-      headers: { ...this.headers }
-    };
+    const headers = { ...this.headers };
+    let method = 'GET';
+    let body = null;
 
     if (insert) {
-      config.method = 'POST';
-      config.body = JSON.stringify(insert);
-      config.headers['Prefer'] = 'return=representation';
+      method = 'POST';
+      body = JSON.stringify(insert);
+      headers['Prefer'] = 'return=representation';
     } else if (update) {
-      config.method = 'PATCH';
-      config.body = JSON.stringify(update);
-      config.headers['Prefer'] = 'return=representation';
-    } else {
-      config.method = 'GET';
+      method = 'PATCH';
+      body = JSON.stringify(update);
+      headers['Prefer'] = 'return=representation';
     }
 
+    return { url, method, headers, body };
+  }
+
+  async query(table, options = {}) {
+    const req = this._buildRequest(table, options);
+
+    // In content scripts, proxy through background to avoid CORS/CSP issues
+    if (_isContentScript()) {
+      return new Promise((resolve, reject) => {
+        try {
+          chrome.runtime.sendMessage(
+            { type: 'SUPABASE_QUERY', data: req },
+            (response) => {
+              if (chrome.runtime.lastError) {
+                reject(new Error(chrome.runtime.lastError.message));
+                return;
+              }
+              if (response && response.success) {
+                resolve(response.data);
+              } else {
+                reject(new Error(response?.error || 'Supabase proxy error'));
+              }
+            }
+          );
+        } catch (err) {
+          reject(err);
+        }
+      });
+    }
+
+    // Direct fetch for popup context
     try {
-      const response = await fetch(url, config);
+      const fetchOptions = { method: req.method, headers: req.headers };
+      if (req.body) fetchOptions.body = req.body;
+      const response = await fetch(req.url, fetchOptions);
 
       if (!response.ok) {
         const error = await response.text();
         throw new Error(`Supabase error: ${error}`);
-      }
-
-      if (insert || update) {
-        return await response.json();
       }
 
       return await response.json();

@@ -436,13 +436,24 @@ You MUST respond with a JSON object with these exact keys:
     if (!platform) return false;
 
     if (e.type === "keydown" && e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      if (isInsideInput(e.target) || isInsideInput(document.activeElement)) {
+      const inInput = isInsideInput(e.target) || isInsideInput(document.activeElement);
+      if (inInput) {
+        console.log("[JACE] Enter key send detected", { target: e.target?.tagName, activeEl: document.activeElement?.tagName });
+        return true;
+      }
+      // Fallback for Claude: check if we're inside ANY contenteditable
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.contentEditable === "true" || activeEl.closest('[contenteditable="true"]'))) {
+        console.log("[JACE] Enter key send detected via contenteditable fallback");
         return true;
       }
     }
 
     if (e.type === "click" || e.type === "pointerdown" || e.type === "mousedown") {
-      if (isSendButton(e.target)) return true;
+      if (isSendButton(e.target)) {
+        console.log("[JACE] Send button detected", { sel: e.target?.getAttribute?.("aria-label"), testid: e.target?.getAttribute?.("data-testid") });
+        return true;
+      }
     }
 
     return false;
@@ -814,20 +825,14 @@ You MUST respond with a JSON object with these exact keys:
   }
 
   async function interceptSubmission(e) {
-    if (!state.isFirstMessage || state.interceptActive) {
-      console.log("[JACE] Skipped - Not first message or already active", { isFirstMessage: state.isFirstMessage, interceptActive: state.interceptActive });
-      return;
-    }
-    if (!state.consentGiven) {
-      console.log("[JACE] Skipped - No consent given. Please open extension popup and set participant ID");
-      return;
-    }
-    if (!state.platform) {
-      console.log("[JACE] Skipped - Platform not detected");
-      return;
-    }
+    if (!state.isFirstMessage || state.interceptActive) return;
+    if (!state.consentGiven) return;
+    if (!state.platform) return;
 
     if (!isSendAction(e)) return;
+
+    // Log state at interception point for debugging
+    console.log("[JACE] Intercepting send action", { type: e.type, isFirstMessage: state.isFirstMessage, consentGiven: state.consentGiven, platform: state.platform?.name });
 
     const promptText = getPromptText();
     console.log("[JACE] Send action detected!", e.type, "prompt length:", promptText.length);
