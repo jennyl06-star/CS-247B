@@ -377,6 +377,10 @@ function applySkipRateColor(rate) {
 function applyAvgScoreColor(score) {
   const el = document.getElementById('avg-score');
   if (!el) return;
+  if (score === 100) {
+    el.style.color = '#a855f7';
+    return;
+  }
   const colors = [
     '#a00000', // 0-10
     '#cc2020', // 10-20
@@ -387,7 +391,7 @@ function applyAvgScoreColor(score) {
     '#c4d44a', // 60-70
     '#8dce63', // 70-80
     '#52bf7e', // 80-90
-    '#20a565', // 90-100
+    '#20a565', // 90-99
   ];
   const idx = Math.min(Math.floor(score / 10), 9);
   el.style.color = colors[idx];
