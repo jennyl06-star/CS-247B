@@ -498,8 +498,19 @@
   color: var(--jace-blue-light);
   font-weight: 600;
 }
-.cti-familiarity-hint {
+.cti-familiarity-slider-row {
+  margin-top: 16px;
+}
+.cti-familiarity-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--jace-text-muted);
+  margin-top: 4px;
+  padding: 0 2px;
+}
+.cti-familiarity-value {
   font-size: 13px;
   color: var(--jace-text-muted);
-  font-style: italic;
+  margin-top: 10px !important;
 }

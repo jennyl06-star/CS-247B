@@ -618,23 +618,32 @@ You MUST respond with a JSON object with these exact keys:
         <p class="cti-subtitle">Before we dive into planning questions...</p>
       </div>
       <div class="cti-familiarity-question">
-        <p>Are you familiar with <strong>${escapeHtml(conceptName)}</strong>?</p>
-        <p class="cti-familiarity-hint">If you're just learning about this concept, we'll adjust our questions accordingly.</p>
+        <p>How familiar are you with <strong>${escapeHtml(conceptName)}</strong>?</p>
+        <div class="cti-familiarity-slider-row">
+          <input type="range" id="cti-familiarity-slider" min="0" max="5" value="3" step="1" style="width:100%;" />
+          <div class="cti-familiarity-labels">
+            <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+          </div>
+          <p class="cti-familiarity-value">Selected: <strong id="cti-familiarity-display">3</strong> / 5</p>
+        </div>
       </div>
-      <div class="cti-button-row" style="justify-content: center; gap: 12px;">
-        <button class="cti-btn cti-btn-secondary" id="cti-familiar-no">Not Really</button>
-        <button class="cti-btn cti-btn-primary" id="cti-familiar-yes">Yes, I'm Familiar</button>
+      <div class="cti-button-row" style="justify-content: center;">
+        <button class="cti-btn cti-btn-primary" id="cti-familiar-submit">Continue</button>
       </div>
     `;
 
-    document.getElementById("cti-familiar-yes").addEventListener("click", () => {
-      logEvent("familiarity_check", { prompt, concept: conceptName, familiar: true });
-      onYes();
-    });
+    const slider = document.getElementById("cti-familiarity-slider");
+    const display = document.getElementById("cti-familiarity-display");
+    slider.addEventListener("input", () => { display.textContent = slider.value; });
 
-    document.getElementById("cti-familiar-no").addEventListener("click", () => {
-      logEvent("familiarity_check", { prompt, concept: conceptName, familiar: false });
-      onNo();
+    document.getElementById("cti-familiar-submit").addEventListener("click", () => {
+      const value = parseInt(slider.value, 10);
+      logEvent("familiarity_check", { prompt, concept: conceptName, familiarity: value });
+      if (value <= 1) {
+        onNo();
+      } else {
+        onYes();
+      }
     });
   }
 
