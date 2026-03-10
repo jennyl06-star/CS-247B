@@ -1,7 +1,7 @@
 # JACE - Critical Thinking AI Helper (Chrome Extension)
 
 A Chrome extension that encourages critical thinking before sending prompts to AI chatbots through personalized reflection questions.
-EXTENSION ZIP LINK: `https://drive.google.com/file/d/1PphFaPKvPqUsXQkoW0Ug9KRTBoCfziVU/view?usp=sharing`
+[EXTENSION ZIP LINK](https://drive.google.com/file/d/1PphFaPKvPqUsXQkoW0Ug9KRTBoCfziVU/view?usp=sharing)
 
 ## Features
 
