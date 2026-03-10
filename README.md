@@ -1,58 +1,27 @@
 # JACE - Critical Thinking AI Helper (Chrome Extension)
 
 A Chrome extension that encourages critical thinking before sending prompts to AI chatbots through personalized reflection questions.
+EXTENSION ZIP LINK: `https://drive.google.com/file/d/1PphFaPKvPqUsXQkoW0Ug9KRTBoCfziVU/view?usp=sharing`
 
 ## Features
 
-✅ **Intent Parser** - Automatically skips intervention for simple questions
-✅ **Adaptive Questioning** - Round 2 questions adapt based on Round 1 answers
-✅ **Evaluation Scores** - See how well you've thought through your question
-✅ **Dashboard** - View your usage history and statistics
-✅ **Customizable Settings** - Adjust number of questions, rounds, and thresholds
-✅ **Multi-Platform** - Works on ChatGPT, Claude, Gemini, and Copilot
+1.  **Intent Parser** - Automatically skips intervention for simple questions
+2. **Adaptive Questioning** - Round 2 questions adapt based on Round 1 answers
+3. **Evaluation Scores** - See how well you've thought through your question
+4. **Dashboard** - View your usage history and statistics, including skip rate and evaluation score average
+5. **Customizable Settings** - Adjust number of questions, rounds, and thresholds
+6. **Multi-Platform** - Works on ChatGPT, Claude, Gemini, and Copilot
+7. **Togglable** - Togglable switch for each of the four playforms.
 
 ## Installation
-
-### Generate Icons
-
-1. Open `extension/icons/generate-icons.html` in your browser
-2. Right-click each canvas and save as:
-   - `icon16.png`
-   - `icon48.png`
-   - `icon128.png`
-3. Save all icons in the `extension/icons/` directory
 
 ### Load Extension in Chrome
 
 1. Open Chrome and go to `chrome://extensions/`
 2. Enable **Developer mode** (toggle in top right)
 3. Click **Load unpacked**
-4. Select the `extension` folder
+4. Select the `extension` folder (or `JACE/extension` if cloned from GitHub)
 5. The JACE extension should now appear in your extensions list
-
-## Configuration
-
-### ⚠️ REQUIRED: API Setup
-
-**The extension will not work until you configure the API authentication.**
-
-You will see `403` errors in the console until this is set up.
-
-#### Option 1: Get Research Study Credentials (Recommended)
-If you're part of a research study, contact your researcher to get the `PROXY_SECRET`.
-
-1. Open `extension/content-script.js`
-2. Find line 6: `PROXY_SECRET: ""`
-3. Add the secret provided by your researcher
-
-#### Option 2: Use Your Own OpenAI API Key
-If running independently:
-
-1. Get an API key from https://platform.openai.com/api-keys
-2. Modify `extension/background.js` to use OpenAI directly (see `API_SETUP_REQUIRED.md`)
-3. Note: This will cost money based on usage (~$0.15 per 1M tokens)
-
-See `API_SETUP_REQUIRED.md` in the project root for detailed instructions.
 
 ### First-Time Setup
 
@@ -152,7 +121,7 @@ For technical issues with the extension:
 
 ## Version
 
-Current Version: **5.0.0**
+Current Version: **6.0.0**
 
 ## Credits
 
