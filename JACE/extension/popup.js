@@ -1,7 +1,7 @@
 const DEFAULT_CONFIG = {
   NUM_QUESTIONS: 2,
   MAX_LOOPS: 2,
-  INTENT_THRESHOLD: 6,
+  INTENT_THRESHOLD: 3,
   APPEND_PLANNING_TO_PROMPT: true,
   LOG_DATA: true,
   MIN_SCORE_ROUND_1: 70,
@@ -82,6 +82,8 @@ function updateStatsFromSupabase(stats) {
   document.getElementById('total-prompts').textContent = stats.totalPrompts;
   document.getElementById('avg-score').textContent = stats.avgScore || '-';
   document.getElementById('skip-rate').textContent = `${stats.skipRate}%`;
+  applySkipRateColor(stats.skipRate);
+  if (stats.avgScore != null) applyAvgScoreColor(parseFloat(stats.avgScore));
 }
 
 function updateHistoryFromSupabase(history) {
@@ -97,15 +99,15 @@ function updateHistoryFromSupabase(history) {
     const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    const badges = [];
+    let statusBadge = '';
     if (query.skipped) {
-      badges.push('<span class="history-badge skipped">Skipped</span>');
+      statusBadge = '<span class="history-badge skipped">Skipped</span>';
     } else if (query.completed) {
-      badges.push('<span class="history-badge completed">Completed</span>');
+      statusBadge = '<span class="history-badge completed">Completed</span>';
     }
-    if (query.final_score !== null) {
-      badges.push(`<span class="history-badge score">Score: ${query.final_score}/100</span>`);
-    }
+    const scoreHTML = query.final_score !== null
+      ? `<span class="history-score">${query.final_score}<span class="history-score-denom">/100</span></span>`
+      : '';
 
     return `
       <div class="history-item">
@@ -114,7 +116,10 @@ function updateHistoryFromSupabase(history) {
           <span class="history-time">${dateStr} ${timeStr}</span>
         </div>
         <div class="history-prompt">${escapeHtml(query.original_prompt)}</div>
-        <div class="history-meta">${badges.join('')}</div>
+        <div class="history-footer">
+          <div>${statusBadge}</div>
+          ${scoreHTML}
+        </div>
       </div>
     `;
   }).join('');
@@ -123,10 +128,16 @@ function updateHistoryFromSupabase(history) {
 function updateStatsFromLogs(logs) {
   const totalPrompts = logs.filter(log => log.eventType === 'prompt_intercepted').length;
   const skipped = logs.filter(log => log.eventType === 'skipped').length;
-  const evaluations = logs.filter(log => log.eventType === 'reflection_evaluated' && log.score);
 
-  const avgScore = evaluations.length > 0
-    ? (evaluations.reduce((sum, log) => sum + log.score, 0) / evaluations.length).toFixed(1)
+  // Prefer reflection_evaluated scores; fall back to reflection_approved.finalScore
+  const evaluations = logs.filter(log => log.eventType === 'reflection_evaluated' && log.score);
+  const approvedScores = evaluations.length === 0
+    ? logs.filter(log => log.eventType === 'reflection_approved' && log.finalScore)
+    : [];
+  const allScores = evaluations.map(l => l.score).concat(approvedScores.map(l => l.finalScore));
+
+  const avgScore = allScores.length > 0
+    ? (allScores.reduce((a, b) => a + b, 0) / allScores.length).toFixed(1)
     : '-';
 
   const skipRate = totalPrompts > 0
@@ -136,6 +147,8 @@ function updateStatsFromLogs(logs) {
   document.getElementById('total-prompts').textContent = totalPrompts;
   document.getElementById('avg-score').textContent = avgScore;
   document.getElementById('skip-rate').textContent = `${skipRate}%`;
+  applySkipRateColor(skipRate);
+  if (avgScore !== '-') applyAvgScoreColor(parseFloat(avgScore));
 }
 
 function updateHistoryFromLogs(logs) {
@@ -167,6 +180,9 @@ function updateHistoryFromLogs(logs) {
       }
       if (log.eventType === 'reflection_approved') {
         sessions[sessionKey].completed = true;
+        if (log.finalScore && !sessions[sessionKey].score) {
+          sessions[sessionKey].score = log.finalScore;
+        }
       }
       if (log.eventType === 'reflection_evaluated' && log.score) {
         sessions[sessionKey].score = log.score;
@@ -186,15 +202,15 @@ function updateHistoryFromLogs(logs) {
     const timeStr = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
     const dateStr = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 
-    const badges = [];
+    let statusBadge = '';
     if (session.skipped) {
-      badges.push('<span class="history-badge skipped">Skipped</span>');
+      statusBadge = '<span class="history-badge skipped">Skipped</span>';
     } else if (session.completed) {
-      badges.push('<span class="history-badge completed">Completed</span>');
+      statusBadge = '<span class="history-badge completed">Completed</span>';
     }
-    if (session.score !== null) {
-      badges.push(`<span class="history-badge score">Score: ${session.score}/100</span>`);
-    }
+    const scoreHTML = session.score !== null
+      ? `<span class="history-score">${session.score}<span class="history-score-denom">/100</span></span>`
+      : '';
 
     return `
       <div class="history-item">
@@ -203,7 +219,10 @@ function updateHistoryFromLogs(logs) {
           <span class="history-time">${dateStr} ${timeStr}</span>
         </div>
         <div class="history-prompt">${escapeHtml(session.prompt)}</div>
-        <div class="history-meta">${badges.join('')}</div>
+        <div class="history-footer">
+          <div>${statusBadge}</div>
+          ${scoreHTML}
+        </div>
       </div>
     `;
   }).join('');
@@ -334,6 +353,48 @@ function showMessage(text, type) {
   setTimeout(() => {
     messageEl.className = 'message';
   }, 3000);
+}
+
+function applySkipRateColor(rate) {
+  const el = document.getElementById('skip-rate');
+  if (!el) return;
+  const colors = [
+    '#20a565', // 0-10%
+    '#52bf7e', // 10-20%
+    '#8dce63', // 20-30%
+    '#c4d44a', // 30-40%
+    '#f0c030', // 40-50%
+    '#f0a030', // 50-60%
+    '#e87030', // 60-70%
+    '#e04530', // 70-80%
+    '#cc2020', // 80-90%
+    '#a00000', // 90-100%
+  ];
+  const idx = Math.min(Math.floor(rate / 10), 9);
+  el.style.color = colors[idx];
+}
+
+function applyAvgScoreColor(score) {
+  const el = document.getElementById('avg-score');
+  if (!el) return;
+  if (score === 100) {
+    el.style.color = '#a855f7';
+    return;
+  }
+  const colors = [
+    '#a00000', // 0-10
+    '#cc2020', // 10-20
+    '#e04530', // 20-30
+    '#e87030', // 30-40
+    '#f0a030', // 40-50
+    '#f0c030', // 50-60
+    '#c4d44a', // 60-70
+    '#8dce63', // 70-80
+    '#52bf7e', // 80-90
+    '#20a565', // 90-99
+  ];
+  const idx = Math.min(Math.floor(score / 10), 9);
+  el.style.color = colors[idx];
 }
 
 function escapeHtml(str) {

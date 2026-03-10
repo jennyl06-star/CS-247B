@@ -10,7 +10,7 @@
     NUM_QUESTIONS: 2,
     APPEND_PLANNING_TO_PROMPT: true,
     LOG_DATA: true,
-    INTENT_THRESHOLD: 6,
+    INTENT_THRESHOLD: 3,
     FAMILIARITY_CHECK: true,
     MIN_SCORE_ROUND_1: 70,
     MIN_SCORE_ROUND_2: 50,
@@ -136,6 +136,8 @@
     currentQueryId: null,
     supabase: null,
     allAnswers: [],
+    pendingLogs: [],
+    logFlushTimer: null,
   };
 
   function detectPlatform() {
@@ -154,6 +156,12 @@
     } catch {
       return false;
     }
+  }
+
+  // Strips markdown code fences if the model ignores response_format and wraps JSON
+  function parseJSON(raw) {
+    const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim();
+    return JSON.parse(cleaned);
   }
 
   async function callOpenAI(systemPrompt, userMessage, jsonMode = true) {
@@ -201,7 +209,7 @@ Score the complexity from 1-10:
 You MUST respond with JSON: {"complexity_score": number, "reasoning": "brief explanation"}`;
 
     const raw = await callOpenAI(systemPrompt, `User's prompt:\n"${prompt}"`);
-    return JSON.parse(raw);
+    return parseJSON(raw);
   }
 
   async function checkFamiliarity(prompt) {
@@ -213,7 +221,7 @@ Determine if asking "Are you familiar with this concept?" would be helpful.
 You MUST respond with JSON: {"ask_familiarity": true/false, "concept_name": "the main concept or topic"}`;
 
     const raw = await callOpenAI(systemPrompt, `User's prompt:\n"${prompt}"`);
-    return JSON.parse(raw);
+    return parseJSON(raw);
   }
 
   async function generateQuestions(prompt, isRound2 = false, previousQA = null) {
@@ -291,14 +299,15 @@ Evaluate whether the student has:
 - Formed at least a rough plan or identified what they need
 
 Score their responses from 1-100 where:
-- 1-20: Completely minimal effort — gibberish, random characters, or no attempt at all
-- 21-40: Very little effort — single words, "idk", or clearly not trying
-- 41-65: Some effort but shallow — student tried but answers are brief or surface-level
-- 66-80: Good engagement — student showed real thought, even if answers are imperfect or brief
-- 81-90: Strong engagement — clear understanding and thoughtful planning
-- 91-100: Excellent critical thinking — thorough, insightful, well-reasoned
+- 1-20: No effort — gibberish, completely off-topic, or refused to engage
+- 21-50: Minimal effort — single words, "I don't know", vague answers with no specifics, or generic filler
+- 51-60: Surface-level — student tried but answers are generic, hedge with uncertainty, or repeat the question without adding real thought
+- 61-75: Moderate engagement — shows some genuine thought and includes a few specific ideas, but lacks depth, clear planning, or awareness of tradeoffs
+- 76-90: Strong engagement — specific, well-reasoned answers that demonstrate real understanding and a concrete plan
+- 91-99: Very strong — comprehensive, detailed, multi-faceted answers that cover key angles and show critical awareness of challenges
+- 100: Exceptional (extremely rare) — essentially perfect critical thinking; professional-quality reasoning that is thorough, nuanced, and would meaningfully transform the AI's response
 
-Be generous: reward any genuine attempt to think through the problem. A student who tries but gives imperfect answers should score in the 60s or 70s, not the 40s. Reserve low scores (below 40) only for students who are clearly not making any real effort.
+Be critical and exacting. Vague answers, hedging, and generic ideas should score in the 51-60 range even with genuine effort. A score of 76+ requires specific, actionable content — not just good intentions. Scores above 90 should be rare, and 100 should almost never occur.
 
 IMPORTANT: This is Round ${roundNumber + 1}. The minimum passing score is ${minScore}/100.
 
@@ -316,7 +325,7 @@ You MUST respond with a JSON object with these exact keys:
 
     const userMsg = `Original prompt:\n"${prompt}"\n\nReflection Q&A:\n${qaBlock}`;
     const raw = await callOpenAI(systemPrompt, userMsg);
-    return JSON.parse(raw);
+    return parseJSON(raw);
   }
 
   function getPromptTextarea() {
@@ -436,13 +445,24 @@ You MUST respond with a JSON object with these exact keys:
     if (!platform) return false;
 
     if (e.type === "keydown" && e.key === "Enter" && !e.shiftKey && !e.ctrlKey && !e.metaKey) {
-      if (isInsideInput(e.target) || isInsideInput(document.activeElement)) {
+      const inInput = isInsideInput(e.target) || isInsideInput(document.activeElement);
+      if (inInput) {
+        console.log("[JACE] Enter key send detected", { target: e.target?.tagName, activeEl: document.activeElement?.tagName });
+        return true;
+      }
+      // Fallback for Claude: check if we're inside ANY contenteditable
+      const activeEl = document.activeElement;
+      if (activeEl && (activeEl.contentEditable === "true" || activeEl.closest('[contenteditable="true"]'))) {
+        console.log("[JACE] Enter key send detected via contenteditable fallback");
         return true;
       }
     }
 
     if (e.type === "click" || e.type === "pointerdown" || e.type === "mousedown") {
-      if (isSendButton(e.target)) return true;
+      if (isSendButton(e.target)) {
+        console.log("[JACE] Send button detected", { sel: e.target?.getAttribute?.("aria-label"), testid: e.target?.getAttribute?.("data-testid") });
+        return true;
+      }
     }
 
     return false;
@@ -567,6 +587,22 @@ You MUST respond with a JSON object with these exact keys:
     `;
   }
 
+  function showSkipNotice(overlay, onDone) {
+    const modal = overlay.querySelector("#cti-modal");
+    modal.innerHTML = `
+      ${wordmarkHTML()}
+      <div class="cti-skip-notice">
+        <div class="cti-skip-icon">✓</div>
+        <div class="cti-skip-title">Skipping Prompt…</div>
+        <div class="cti-skip-subtitle">This question looks straightforward — sending it directly.</div>
+      </div>
+    `;
+    setTimeout(() => {
+      overlay.classList.remove("visible");
+      setTimeout(() => { overlay.remove(); onDone(); }, 300);
+    }, 1200);
+  }
+
   function getScoreBadgeClass(score) {
     if (score >= 70) return "high";
     if (score >= 40) return "medium";
@@ -582,23 +618,32 @@ You MUST respond with a JSON object with these exact keys:
         <p class="cti-subtitle">Before we dive into planning questions...</p>
       </div>
       <div class="cti-familiarity-question">
-        <p>Are you familiar with <strong>${escapeHtml(conceptName)}</strong>?</p>
-        <p class="cti-familiarity-hint">If you're just learning about this concept, we'll adjust our questions accordingly.</p>
+        <p>How familiar are you with <strong>${escapeHtml(conceptName)}</strong>?</p>
+        <div class="cti-familiarity-slider-row">
+          <input type="range" id="cti-familiarity-slider" min="0" max="5" value="3" step="1" style="width:100%;" />
+          <div class="cti-familiarity-labels">
+            <span>0</span><span>1</span><span>2</span><span>3</span><span>4</span><span>5</span>
+          </div>
+          <p class="cti-familiarity-value">Selected: <strong id="cti-familiarity-display">3</strong> / 5</p>
+        </div>
       </div>
-      <div class="cti-button-row" style="justify-content: center; gap: 12px;">
-        <button class="cti-btn cti-btn-secondary" id="cti-familiar-no">Not Really</button>
-        <button class="cti-btn cti-btn-primary" id="cti-familiar-yes">Yes, I'm Familiar</button>
+      <div class="cti-button-row" style="justify-content: center;">
+        <button class="cti-btn cti-btn-primary" id="cti-familiar-submit">Continue</button>
       </div>
     `;
 
-    document.getElementById("cti-familiar-yes").addEventListener("click", () => {
-      logEvent("familiarity_check", { prompt, concept: conceptName, familiar: true });
-      onYes();
-    });
+    const slider = document.getElementById("cti-familiarity-slider");
+    const display = document.getElementById("cti-familiarity-display");
+    slider.addEventListener("input", () => { display.textContent = slider.value; });
 
-    document.getElementById("cti-familiar-no").addEventListener("click", () => {
-      logEvent("familiarity_check", { prompt, concept: conceptName, familiar: false });
-      onNo();
+    document.getElementById("cti-familiar-submit").addEventListener("click", () => {
+      const value = parseInt(slider.value, 10);
+      logEvent("familiarity_check", { prompt, concept: conceptName, familiarity: value });
+      if (value <= 1) {
+        onNo();
+      } else {
+        onYes();
+      }
     });
   }
 
@@ -681,6 +726,38 @@ You MUST respond with a JSON object with these exact keys:
     modal.querySelectorAll(".cti-btn").forEach((b) => (b.disabled = true));
   }
 
+  function showScoreScreen(modal, score, promptText, feedback) {
+    const color = score >= 80 ? 'var(--jace-green-mid)' :
+                  score >= 60 ? 'var(--jace-blue-light)' :
+                  score >= 40 ? '#ffc107' : '#ff6b6b';
+    const message = score >= 80 ? 'Excellent reflection!' :
+                    score >= 60 ? 'Good thinking!' :
+                    score >= 40 ? 'Keep reflecting!' : 'Thanks for trying!';
+
+    modal.innerHTML = `
+      ${wordmarkHTML()}
+      <div class="cti-score-screen">
+        <div class="cti-score-display" style="--score-color: ${color}">
+          <div class="cti-score-big">${score}</div>
+          <div class="cti-score-denom">/100</div>
+        </div>
+        <div class="cti-score-message">${message}</div>
+        <div class="cti-score-sending" id="cti-score-countdown">Sending in 3s…</div>
+      </div>
+    `;
+
+    let secs = 3;
+    const tick = setInterval(() => {
+      secs--;
+      const el = document.getElementById('cti-score-countdown');
+      if (el) el.textContent = secs > 0 ? `Sending in ${secs}s…` : 'Sending…';
+      if (secs <= 0) {
+        clearInterval(tick);
+        closeModalAndSend(promptText, feedback, score);
+      }
+    }, 1000);
+  }
+
   async function handleReflectionSubmit(modal, prompt, questions) {
     const inputs = modal.querySelectorAll(".cti-answer-input");
     const answers = Array.from(inputs).map((el) => el.value.trim());
@@ -717,15 +794,19 @@ You MUST respond with a JSON object with these exact keys:
       });
 
       if (state.supabase && state.currentQueryId) {
-        await state.supabase.insertReflectionRound({
-          query_id: state.currentQueryId,
-          round_number: state.reflectionLoop,
-          questions: questions.map(q => q.question),
-          answers: answers,
-          evaluation_score: evaluation.score,
-          evaluation_feedback: evaluation.feedback,
-          sufficient: evaluation.sufficient
-        });
+        try {
+          await state.supabase.insertReflectionRound({
+            query_id: state.currentQueryId,
+            round_number: state.reflectionLoop,
+            questions: questions.map(q => q.question),
+            answers: answers,
+            evaluation_score: evaluation.score,
+            evaluation_feedback: evaluation.feedback,
+            sufficient: evaluation.sufficient
+          });
+        } catch (dbErr) {
+          console.warn("[JACE] Supabase insertReflectionRound failed:", dbErr.message);
+        }
       }
 
       if (evaluation.sufficient || state.reflectionLoop >= CONFIG.MAX_LOOPS - 1) {
@@ -750,15 +831,19 @@ You MUST respond with a JSON object with these exact keys:
         }
 
         if (state.supabase && state.currentQueryId) {
-          await state.supabase.updateQueryHistory(state.currentQueryId, {
-            completed: true,
-            total_rounds: state.reflectionLoop + 1,
-            final_score: evaluation.score,
-            enhanced_prompt: enhancedPrompt
-          });
+          try {
+            await state.supabase.updateQueryHistory(state.currentQueryId, {
+              completed: true,
+              total_rounds: state.reflectionLoop + 1,
+              final_score: evaluation.score,
+              enhanced_prompt: enhancedPrompt
+            });
+          } catch (dbErr) {
+            console.warn("[JACE] Supabase updateQueryHistory failed:", dbErr.message);
+          }
         }
 
-        closeModalAndSend(enhancedPrompt, evaluation.feedback, evaluation.score);
+        showScoreScreen(modal, evaluation.score, enhancedPrompt, evaluation.feedback);
       } else {
         state.reflectionLoop++;
         logEvent("reflection_insufficient", {
@@ -814,20 +899,14 @@ You MUST respond with a JSON object with these exact keys:
   }
 
   async function interceptSubmission(e) {
-    if (!state.isFirstMessage || state.interceptActive) {
-      console.log("[JACE] Skipped - Not first message or already active", { isFirstMessage: state.isFirstMessage, interceptActive: state.interceptActive });
-      return;
-    }
-    if (!state.consentGiven) {
-      console.log("[JACE] Skipped - No consent given. Please open extension popup and set participant ID");
-      return;
-    }
-    if (!state.platform) {
-      console.log("[JACE] Skipped - Platform not detected");
-      return;
-    }
+    if (!state.isFirstMessage || state.interceptActive) return;
+    if (!state.consentGiven) return;
+    if (!state.platform) return;
 
     if (!isSendAction(e)) return;
+
+    // Log state at interception point for debugging
+    console.log("[JACE] Intercepting send action", { type: e.type, isFirstMessage: state.isFirstMessage, consentGiven: state.consentGiven, platform: state.platform?.name });
 
     const promptText = getPromptText();
     console.log("[JACE] Send action detected!", e.type, "prompt length:", promptText.length);
@@ -874,19 +953,23 @@ You MUST respond with a JSON object with these exact keys:
       });
 
       if (state.supabase) {
-        const queryData = await state.supabase.insertQueryHistory({
-          participant_id: state.participantId,
-          platform: state.platform?.name || "unknown",
-          original_prompt: promptText,
-          complexity_score: intentAnalysis.complexity_score,
-          intent_reasoning: intentAnalysis.reasoning,
-          conversation_url: window.location.href,
-          skipped: false,
-          completed: false
-        });
+        try {
+          const queryData = await state.supabase.insertQueryHistory({
+            participant_id: state.participantId,
+            platform: state.platform?.name || "unknown",
+            original_prompt: promptText,
+            complexity_score: intentAnalysis.complexity_score,
+            intent_reasoning: intentAnalysis.reasoning,
+            conversation_url: window.location.href,
+            skipped: false,
+            completed: false
+          });
 
-        if (queryData && queryData.length > 0) {
-          state.currentQueryId = queryData[0].id;
+          if (queryData && queryData.length > 0) {
+            state.currentQueryId = queryData[0].id;
+          }
+        } catch (dbErr) {
+          console.warn("[JACE] Supabase insert failed, continuing without logging:", dbErr.message);
         }
       }
 
@@ -899,17 +982,19 @@ You MUST respond with a JSON object with these exact keys:
         });
 
         if (state.supabase && state.currentQueryId) {
-          await state.supabase.updateQueryHistory(state.currentQueryId, {
-            skipped: true,
-            total_rounds: 0
-          });
+          try {
+            await state.supabase.updateQueryHistory(state.currentQueryId, {
+              skipped: true,
+              total_rounds: 0
+            });
+          } catch (dbErr) {
+            console.warn("[JACE] Supabase update failed:", dbErr.message);
+          }
         }
 
-        overlay.classList.remove("visible");
-        setTimeout(() => overlay.remove(), 300);
         state.interceptActive = false;
         state.isFirstMessage = false;
-        setTimeout(() => clickSendButton(), 100);
+        showSkipNotice(overlay, () => clickSendButton());
         return;
       }
 
@@ -977,17 +1062,13 @@ You MUST respond with a JSON object with these exact keys:
             .addEventListener("click", () => closeModalAndSend(promptText, null));
         });
     } catch (err) {
-      console.error("CTI intent analysis error:", err);
-      showLoading(modal, "Generating your reflection questions...");
-      generateQuestions(promptText, false, null)
-        .then((questions) => {
-          logEvent("questions_generated", { questions: questions.map((q) => q.question) });
-          showQuestions(modal, promptText, questions);
-        })
-        .catch((err2) => {
-          console.error("CTI question generation error:", err2);
-          closeModalAndSend(promptText, null);
-        });
+      // Intent analysis failed (API error or JSON parse error) — skip intervention
+      // to avoid blocking simple prompts when the classifier can't run
+      console.error("[JACE] Intent analysis failed, skipping intervention:", err);
+      logEvent("intent_error", { prompt: promptText, error: err.message });
+      state.interceptActive = false;
+      state.isFirstMessage = false;
+      showSkipNotice(overlay, () => clickSendButton());
     }
   }
 
@@ -1006,14 +1087,21 @@ You MUST respond with a JSON object with these exact keys:
 
     state.sessionLog.push(entry);
 
-    try {
-      chrome.storage.local.get(["cti_logs"], (result) => {
-        if (chrome.runtime.lastError) return;
-        const allLogs = result.cti_logs || [];
-        allLogs.push(entry);
-        chrome.storage.local.set({ cti_logs: allLogs });
-      });
-    } catch {}
+    // Batch writes to avoid race conditions when multiple events fire in rapid succession
+    state.pendingLogs.push(entry);
+    if (!state.logFlushTimer) {
+      state.logFlushTimer = setTimeout(() => {
+        const toFlush = state.pendingLogs.splice(0);
+        state.logFlushTimer = null;
+        try {
+          chrome.storage.local.get(["cti_logs"], (result) => {
+            if (chrome.runtime.lastError) return;
+            const allLogs = result.cti_logs || [];
+            chrome.storage.local.set({ cti_logs: [...allLogs, ...toFlush] });
+          });
+        } catch {}
+      }, 50);
+    }
 
     console.log("[JACE Log]", entry);
 
@@ -1071,10 +1159,13 @@ You MUST respond with a JSON object with these exact keys:
       }
 
       // Attach send interceptors only if platform is enabled
-      document.addEventListener("keydown", interceptSubmission, true);
-      document.addEventListener("click", interceptSubmission, true);
-      document.addEventListener("pointerdown", interceptSubmission, true);
-      document.addEventListener("mousedown", interceptSubmission, true);
+      // Use window (not document) so we fire before framework-level capture handlers
+      // (e.g. Tiptap/ProseMirror on Claude registers at window level and calls
+      // stopPropagation, which would prevent document-level listeners from firing)
+      window.addEventListener("keydown", interceptSubmission, true);
+      window.addEventListener("click", interceptSubmission, true);
+      window.addEventListener("pointerdown", interceptSubmission, true);
+      window.addEventListener("mousedown", interceptSubmission, true);
 
       let lastAttachedBtn = null;
       setInterval(() => {

@@ -12,6 +12,13 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
       .catch((error) => sendResponse({ error: error.message }));
     return true;
   }
+
+  if (request.type === "SUPABASE_QUERY") {
+    handleSupabaseQuery(request.data)
+      .then(sendResponse)
+      .catch((error) => sendResponse({ success: false, error: error.message }));
+    return true;
+  }
 });
 
 async function handleAPICall(data) {
@@ -59,6 +66,22 @@ async function handleAPICall(data) {
     }
 
     return { success: true, data: text };
+  } catch (error) {
+    return { success: false, error: error.message };
+  }
+}
+
+async function handleSupabaseQuery(data) {
+  const { url, method, headers, body } = data;
+  try {
+    const options = { method, headers };
+    if (body) options.body = body;
+    const response = await fetch(url, options);
+    const text = await response.text();
+    if (!response.ok) {
+      return { success: false, error: `Supabase error ${response.status}: ${text}` };
+    }
+    return { success: true, data: text ? JSON.parse(text) : null };
   } catch (error) {
     return { success: false, error: error.message };
   }

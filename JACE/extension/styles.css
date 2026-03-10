@@ -418,6 +418,67 @@
 .cti-icon-circle.blue  { background: var(--jace-blue-mid); }
 .cti-icon-circle.teal  { background: var(--jace-blue-light); }
 
+/* ── Skip Notice ── */
+.cti-skip-notice {
+  text-align: center;
+  padding: 28px 0 32px;
+}
+.cti-skip-icon {
+  font-size: 40px;
+  margin-bottom: 14px;
+  color: var(--jace-green-mid);
+}
+.cti-skip-title {
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--jace-text);
+  margin-bottom: 8px;
+}
+.cti-skip-subtitle {
+  font-size: 13px;
+  color: var(--jace-text-muted);
+}
+
+/* ── Score Screen ── */
+.cti-score-screen {
+  text-align: center;
+  padding: 16px 0 24px;
+}
+.cti-score-display {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 4px;
+  margin: 12px 0 16px;
+}
+.cti-score-big {
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 100px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--score-color, var(--jace-green-mid));
+}
+.cti-score-denom {
+  font-size: 28px;
+  color: var(--jace-text-muted);
+  font-weight: 500;
+  align-self: flex-end;
+  margin-bottom: 14px;
+}
+.cti-score-message {
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 20px;
+  font-weight: 600;
+  color: var(--jace-text);
+  margin-bottom: 6px;
+}
+.cti-score-sending {
+  font-size: 13px;
+  color: var(--jace-text-dim);
+  margin-top: 14px;
+}
+
 /* ── Familiarity Check ── */
 .cti-familiarity-question {
   background: var(--jace-surface-2);
@@ -437,8 +498,19 @@
   color: var(--jace-blue-light);
   font-weight: 600;
 }
-.cti-familiarity-hint {
+.cti-familiarity-slider-row {
+  margin-top: 16px;
+}
+.cti-familiarity-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--jace-text-muted);
+  margin-top: 4px;
+  padding: 0 2px;
+}
+.cti-familiarity-value {
   font-size: 13px;
   color: var(--jace-text-muted);
-  font-style: italic;
+  margin-top: 10px !important;
 }
