@@ -53,12 +53,9 @@ body {
 .wordmark-icon {
   width: 28px;
   height: 28px;
-  background: var(--jace-green-mid);
-  border-radius: 8px;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
 }
 
 .wordmark-text {
@@ -229,10 +226,11 @@ body {
   -webkit-box-orient: vertical;
 }
 
-.history-meta {
+.history-footer {
   display: flex;
-  gap: 8px;
-  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 20px;
 }
 
 .history-badge {
@@ -252,9 +250,19 @@ body {
   color: var(--jace-green-light);
 }
 
-.history-badge.score {
-  background: rgba(75, 176, 208, 0.15);
+.history-score {
+  font-family: 'Instrument Sans', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
   color: var(--jace-blue-light);
+  line-height: 1;
+}
+
+.history-score-denom {
+  font-size: 10px;
+  font-weight: 500;
+  color: var(--jace-text-dim);
+  margin-left: 1px;
 }
 
 .empty-state {
