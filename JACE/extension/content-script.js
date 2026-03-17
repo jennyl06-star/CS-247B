@@ -138,6 +138,7 @@
     allAnswers: [],
     pendingLogs: [],
     logFlushTimer: null,
+    firedConversationUrls: new Set(), // tracks URLs where intervention has already fired
   };
 
   function detectPlatform() {
@@ -299,15 +300,14 @@ Evaluate whether the student has:
 - Formed at least a rough plan or identified what they need
 
 Score their responses from 1-100 where:
-- 1-20: No effort — gibberish, completely off-topic, or refused to engage
-- 21-50: Minimal effort — single words, "I don't know", vague answers with no specifics, or generic filler
-- 51-60: Surface-level — student tried but answers are generic, hedge with uncertainty, or repeat the question without adding real thought
-- 61-75: Moderate engagement — shows some genuine thought and includes a few specific ideas, but lacks depth, clear planning, or awareness of tradeoffs
-- 76-90: Strong engagement — specific, well-reasoned answers that demonstrate real understanding and a concrete plan
-- 91-99: Very strong — comprehensive, detailed, multi-faceted answers that cover key angles and show critical awareness of challenges
-- 100: Exceptional (extremely rare) — essentially perfect critical thinking; professional-quality reasoning that is thorough, nuanced, and would meaningfully transform the AI's response
+- 1-50: No effort — gibberish, completely off-topic, refused to engage, or single words with no meaningful content
+- 51-70: Minimal effort — vague answers with no specifics, "I don't know", generic filler, or answers that repeat the question without adding real thought
+- 71-80: Moderate engagement — student tried and shows some surface-level understanding; answers are somewhat specific but may lack depth or planning (this is what surface-level engagement looks like)
+- 81-90: Good engagement — shows genuine thought with specific ideas and a rough plan, though may lack full depth or awareness of tradeoffs (this is what moderate engagement looks like)
+- 91-99: Strong engagement — specific, well-reasoned answers that demonstrate real understanding, a concrete plan, and awareness of key challenges
+- 100: Exceptional — comprehensive, multi-faceted answers showing critical awareness and professional-quality reasoning that would meaningfully transform the AI's response
 
-Be critical and exacting. Vague answers, hedging, and generic ideas should score in the 51-60 range even with genuine effort. A score of 76+ requires specific, actionable content — not just good intentions. Scores above 90 should be rare, and 100 should almost never occur.
+Be fair but generous with scores. Surface-level but genuine answers should score in the 71-80 range. A score of 91+ requires specific, well-reasoned content with real planning. Scores of 81-90 should reflect genuine thought with some specifics. Do not be stingy — if a student shows real effort and some understanding, reward them in the 71-90 range.
 
 IMPORTANT: This is Round ${roundNumber + 1}. The minimum passing score is ${minScore}/100.
 
@@ -414,6 +414,29 @@ You MUST respond with a JSON object with these exact keys:
     }
   }
 
+  // Returns a stable key for the current conversation based on URL path,
+  // stripping query params/fragments so minor URL changes don't look like new convos.
+  function getConversationUrl() {
+    return window.location.origin + window.location.pathname;
+  }
+
+  // Returns true only when the URL itself matches a "fresh new chat" pattern
+  // (e.g. chatgpt.com root, claude.ai/new). Used for re-arming after navigation.
+  function isFreshChatUrl() {
+    const platform = state.platform;
+    if (!platform) return false;
+    const url = window.location.href;
+    try {
+      switch (platform.key) {
+        case 'chatgpt': return !!url.match(/^https:\/\/(chatgpt\.com|chat\.openai\.com)\/?$/);
+        case 'claude':  return !!url.match(/^https:\/\/claude\.ai\/(new|chats)?\/?$/);
+        case 'gemini':  return !!url.match(/^https:\/\/gemini\.google\.com\/(app)?\/?$/);
+        case 'copilot': return !!url.match(/^https:\/\/copilot\.microsoft\.com\/?$/);
+        default: return false;
+      }
+    } catch { return false; }
+  }
+
   function isNewConversation() {
     const platform = state.platform;
     if (!platform) return false;
@@ -486,8 +509,45 @@ You MUST respond with a JSON object with these exact keys:
       <div class="cti-wordmark">
         <div class="cti-wordmark-icon">🧠</div>
         <span class="cti-wordmark-text">JACE</span>
+        <button class="cti-info-btn" id="cti-info-btn" title="About JACE & data collected" aria-label="About JACE">ⓘ</button>
+      </div>
+      <div class="cti-info-panel" id="cti-info-panel" hidden>
+        <div class="cti-info-once-notice">⚡ JACE only appears <strong>once per chat</strong>. Start a new conversation to see it again.</div>
+        <strong>What JACE does:</strong>
+        <ul>
+          <li>Pauses on your <strong>first message</strong> in a new conversation to ask reflection questions.</li>
+          <li>Works across <strong>ChatGPT, Claude, Gemini, and Copilot</strong>.</li>
+        </ul>
+        <strong>Data collected:</strong>
+        <ul>
+          <li>Your original prompt, reflection questions &amp; answers, skip status, feedback, timestamps, platform, and participant ID.</li>
+        </ul>
+        <strong>Not collected:</strong> conversation history beyond the first prompt, account info, or any other browsing data.
+        <br><em>Data is used solely for this research study.</em>
+        <hr style="border:none;border-top:1px solid var(--jace-border);margin:10px 0;">
+        <strong>Scoring (1–100):</strong>
+        <ul>
+          <li><strong>1–50:</strong> No effort — gibberish, off-topic, or single words</li>
+          <li><strong>51–70:</strong> Minimal effort — vague or generic answers with no specifics</li>
+          <li><strong>71–80:</strong> Moderate engagement — some surface-level understanding</li>
+          <li><strong>81–90:</strong> Good engagement — genuine thought with specific ideas</li>
+          <li><strong>91–99:</strong> Strong engagement — well-reasoned, concrete, and specific</li>
+          <li><strong>100:</strong> Exceptional — professional-quality reasoning</li>
+        </ul>
       </div>
     `;
+  }
+
+  function attachInfoToggle() {
+    const btn = document.getElementById('cti-info-btn');
+    const panel = document.getElementById('cti-info-panel');
+    if (btn && panel) {
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        panel.hidden = !panel.hidden;
+        btn.classList.toggle('active', !panel.hidden);
+      });
+    }
   }
 
   function showConsentModal() {
@@ -507,9 +567,9 @@ You MUST respond with a JSON object with these exact keys:
 
       <div class="cti-consent-box">
         <strong>📋 What this tool does & what data is collected:</strong>
+        <div class="cti-info-once-notice" style="margin: 8px 0;">⚡ JACE only appears <strong>once per chat</strong>. Start a new conversation to see it again.</div>
         <ul>
           <li>When you send your <strong>first message</strong> in a new conversation, this tool will pause and ask you a few reflection questions before the message is sent.</li>
-          <li>It only activates once per conversation — after that, the AI works normally.</li>
           <li>Works across <strong>ChatGPT, Claude, Gemini, and Copilot</strong>.</li>
         </ul>
         <strong>The following data is collected and shared with the research team:</strong>
@@ -585,6 +645,7 @@ You MUST respond with a JSON object with these exact keys:
         <div class="cti-loading-text">${message}</div>
       </div>
     `;
+    attachInfoToggle();
   }
 
   function showSkipNotice(overlay, onDone) {
@@ -604,8 +665,8 @@ You MUST respond with a JSON object with these exact keys:
   }
 
   function getScoreBadgeClass(score) {
-    if (score >= 70) return "high";
-    if (score >= 40) return "medium";
+    if (score >= 91) return "high";
+    if (score >= 81) return "medium";
     return "low";
   }
 
@@ -632,6 +693,7 @@ You MUST respond with a JSON object with these exact keys:
       </div>
     `;
 
+    attachInfoToggle();
     const slider = document.getElementById("cti-familiarity-slider");
     const display = document.getElementById("cti-familiarity-display");
     slider.addEventListener("input", () => { display.textContent = slider.value; });
@@ -673,19 +735,22 @@ You MUST respond with a JSON object with these exact keys:
       </div>
     `).join("");
 
+    const isFirstRound = state.reflectionLoop === 0;
+
     modal.innerHTML = `
       ${wordmarkHTML()}
+      ${isFirstRound ? `
       <div class="cti-header">
         <h2 class="cti-title">Before You Send...</h2>
         <p class="cti-subtitle">Taking a moment to plan will help you get a much better response.</p>
       </div>
-      <div class="cti-progress">
-        ${progressDots}
-        <span class="cti-progress-label">Round ${loopNum} of ${CONFIG.MAX_LOOPS}</span>
-      </div>
       <div id="cti-prompt-preview">
         <span class="cti-label">Your prompt</span>
         ${escapeHtml(prompt)}
+      </div>` : ''}
+      <div class="cti-progress">
+        ${progressDots}
+        <span class="cti-progress-label">Round ${loopNum} of ${CONFIG.MAX_LOOPS}</span>
       </div>
       ${feedbackHTML}
       <div id="cti-questions-container">
@@ -697,6 +762,7 @@ You MUST respond with a JSON object with these exact keys:
       </div>
     `;
 
+    attachInfoToggle();
     document.getElementById("cti-submit-reflection")
       .addEventListener("click", () => handleReflectionSubmit(modal, prompt, questions));
     document.getElementById("cti-skip").addEventListener("click", async () => {
@@ -727,12 +793,14 @@ You MUST respond with a JSON object with these exact keys:
   }
 
   function showScoreScreen(modal, score, promptText, feedback) {
-    const color = score >= 80 ? 'var(--jace-green-mid)' :
-                  score >= 60 ? 'var(--jace-blue-light)' :
-                  score >= 40 ? '#ffc107' : '#ff6b6b';
-    const message = score >= 80 ? 'Excellent reflection!' :
-                    score >= 60 ? 'Good thinking!' :
-                    score >= 40 ? 'Keep reflecting!' : 'Thanks for trying!';
+    const color = score >= 91 ? 'var(--jace-green-mid)' :
+                  score >= 81 ? 'var(--jace-blue-light)' :
+                  score >= 71 ? '#ffc107' :
+                  score >= 51 ? '#ff9800' : '#ff6b6b';
+    const message = score >= 91 ? 'Excellent reflection!' :
+                    score >= 81 ? 'Great Thinking!' :
+                    score >= 71 ? 'Thanks for the effort!' :
+                    score >= 51 ? 'Try to be more specific!' : 'Thanks for trying!';
 
     modal.innerHTML = `
       ${wordmarkHTML()}
@@ -905,6 +973,14 @@ You MUST respond with a JSON object with these exact keys:
 
     if (!isSendAction(e)) return;
 
+    // Guard: skip if we already fired for this conversation URL
+    const currentUrl = getConversationUrl();
+    if (state.firedConversationUrls.has(currentUrl)) {
+      console.log("[JACE] Already fired for this conversation, skipping.", currentUrl);
+      state.isFirstMessage = false;
+      return;
+    }
+
     // Log state at interception point for debugging
     console.log("[JACE] Intercepting send action", { type: e.type, isFirstMessage: state.isFirstMessage, consentGiven: state.consentGiven, platform: state.platform?.name });
 
@@ -934,6 +1010,7 @@ You MUST respond with a JSON object with these exact keys:
     state.interceptActive = true;
     state.currentPrompt = promptText;
     state.reflectionLoop = 0;
+    state.firedConversationUrls.add(getConversationUrl());
     state.round1Questions = [];
     state.round1Answers = [];
     state.allAnswers = [];
@@ -1200,13 +1277,16 @@ You MUST respond with a JSON object with these exact keys:
           console.log("[JACE] Navigation detected:", lastUrl);
           lastAttachedBtn = null;
           setTimeout(() => {
-            if (isNewConversation()) {
+            // Only re-arm when the user navigates to a genuinely fresh/new chat URL.
+            // This prevents re-arming when the platform changes the URL mid-conversation
+            // (e.g. ChatGPT going from chatgpt.com/ → chatgpt.com/c/abc123 after first send).
+            if (isFreshChatUrl()) {
               state.isFirstMessage = true;
               state.interceptActive = false;
               state.reflectionLoop = 0;
               state.round1Questions = [];
               state.round1Answers = [];
-              console.log("[JACE] New conversation — intervention armed");
+              console.log("[JACE] Fresh chat URL detected — intervention armed:", getConversationUrl());
             }
           }, 500);
         }

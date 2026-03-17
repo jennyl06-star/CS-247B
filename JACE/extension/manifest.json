@@ -5,7 +5,8 @@
   "description": "Encourages critical thinking before sending prompts to AI chatbots through personalized reflection questions",
   "permissions": [
     "storage",
-    "activeTab"
+    "activeTab",
+    "tabs"
   ],
   "host_permissions": [
     "*://chatgpt.com/*",

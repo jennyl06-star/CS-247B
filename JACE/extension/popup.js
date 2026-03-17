@@ -312,8 +312,20 @@ function saveSettings() {
     cti_consent_given: true,
     cti_config: config,
   }, () => {
-    showMessage('Settings saved! JACE is now active. Refresh any open ChatGPT/Claude tabs.', 'success');
+    showMessage('Settings saved! Refreshing active AI tabs…', 'success');
     console.log('[Popup] Settings saved - consent granted for participant:', participantId);
+
+    const aiPatterns = [
+      '*://chatgpt.com/*',
+      '*://chat.openai.com/*',
+      '*://claude.ai/*',
+      '*://gemini.google.com/*',
+      '*://copilot.microsoft.com/*',
+    ];
+
+    chrome.tabs.query({ url: aiPatterns }, (tabs) => {
+      tabs.forEach((tab) => chrome.tabs.reload(tab.id));
+    });
   });
 }
 
