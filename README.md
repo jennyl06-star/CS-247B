@@ -1,9 +1,18 @@
 # JACE - Critical Thinking AI Helper (Chrome Extension)
 
-A Chrome extension that encourages critical thinking before sending prompts to AI chatbots through personalized reflection questions.
+A Chrome extension that encourages critical thinking before sending prompts to AI chatbots through personalized reflection questions. Can download directly if cloning doesn't work with below link:
 [EXTENSION ZIP LINK](https://drive.google.com/file/d/1PphFaPKvPqUsXQkoW0Ug9KRTBoCfziVU/view?usp=sharing)
 
-## Features
+### Installation / Load Extension in Chrome
+
+1. Clone the repository in order to get the JACE/extension folder
+2. Open Chrome and go to `chrome://extensions/`
+3. Enable **Developer mode** (toggle in top right)
+4. Click **Load unpacked**
+5. Select the `extension` folder (or `JACE/extension` if cloned from GitHub)
+6. The JACE extension should now appear in your extensions list
+
+### Features
 
 1.  **Intent Parser** - Automatically skips intervention for simple questions
 2. **Adaptive Questioning** - Round 2 questions adapt based on Round 1 answers
@@ -12,17 +21,6 @@ A Chrome extension that encourages critical thinking before sending prompts to A
 5. **Customizable Settings** - Adjust number of questions, rounds, and thresholds
 6. **Multi-Platform** - Works on ChatGPT, Claude, Gemini, and Copilot
 7. **Togglable** - Togglable switch for each of the four playforms.
-
-## Installation
-
-### Load Extension in Chrome
-
-1. Clone the repository in order to get the JACE/extension folder
-2. Open Chrome and go to `chrome://extensions/`
-3. Enable **Developer mode** (toggle in top right)
-4. Click **Load unpacked**
-5. Select the `extension` folder (or `JACE/extension` if cloned from GitHub)
-6. The JACE extension should now appear in your extensions list
 
 ### First-Time Setup
 
