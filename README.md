@@ -17,11 +17,12 @@ A Chrome extension that encourages critical thinking before sending prompts to A
 
 ### Load Extension in Chrome
 
-1. Open Chrome and go to `chrome://extensions/`
-2. Enable **Developer mode** (toggle in top right)
-3. Click **Load unpacked**
-4. Select the `extension` folder (or `JACE/extension` if cloned from GitHub)
-5. The JACE extension should now appear in your extensions list
+1. Clone the repository in order to get the JACE/extension folder
+2. Open Chrome and go to `chrome://extensions/`
+3. Enable **Developer mode** (toggle in top right)
+4. Click **Load unpacked**
+5. Select the `extension` folder (or `JACE/extension` if cloned from GitHub)
+6. The JACE extension should now appear in your extensions list
 
 ### First-Time Setup
 
